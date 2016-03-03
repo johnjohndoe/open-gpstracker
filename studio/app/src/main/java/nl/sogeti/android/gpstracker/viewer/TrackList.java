@@ -40,6 +40,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v4.app.NavUtils;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AlertDialog;
@@ -47,15 +48,12 @@ import android.support.v7.app.AlertDialog.Builder;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.ContextMenu;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.CheckBox;
-import android.widget.EditText;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -64,6 +62,7 @@ import android.widget.TextView;
 
 import nl.sogeti.android.gpstracker.R;
 import nl.sogeti.android.gpstracker.actions.Statistics;
+import nl.sogeti.android.gpstracker.actions.TrackRenamingFragment;
 import nl.sogeti.android.gpstracker.actions.tasks.GpxParser;
 import nl.sogeti.android.gpstracker.actions.utils.ProgressListener;
 import nl.sogeti.android.gpstracker.adapter.SectionedListAdapter;
@@ -78,7 +77,10 @@ import nl.sogeti.android.log.Log;
  * @author rene (c) Jan 11, 2009, Sogeti B.V.
  * @version $Id$
  */
-public class TrackList extends AppCompatActivity implements ProgressListener {
+public class TrackList extends AppCompatActivity implements
+        TrackRenamingFragment.OnTrackRenamedListener,
+        ProgressListener {
+
     protected static final int DIALOG_ERROR = Menu.FIRST + 28;
     private static final int MENU_DELETE = Menu.FIRST + 0;
     private static final int MENU_SHARE = Menu.FIRST + 1;
@@ -87,14 +89,12 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
     private static final int MENU_SEARCH = Menu.FIRST + 4;
     private static final int MENU_VACUUM = Menu.FIRST + 5;
     private static final int MENU_PICKER = Menu.FIRST + 6;
-    private static final int DIALOG_RENAME = Menu.FIRST + 23;
     private static final int DIALOG_DELETE = Menu.FIRST + 24;
     private static final int DIALOG_VACUUM = Menu.FIRST + 25;
     private static final int DIALOG_IMPORT = Menu.FIRST + 26;
     private static final int FILE_PICKER = Menu.FIRST + 29;
     protected ListView mList;
     protected ListAdapter mAdapter;
-    private EditText mTrackNameView;
     private Uri mDialogTrackUri;
     private String mDialogCurrentName = "";
     private String mErrorDialogMessage;
@@ -107,17 +107,6 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
         @Override
         public void onClick(DialogInterface dialog, int which) {
             getContentResolver().delete(mDialogTrackUri, null, null);
-        }
-    };
-    private OnClickListener mRenameOnClickListener = new DialogInterface.OnClickListener() {
-        @Override
-        public void onClick(DialogInterface dialog, int which) {
-            //         Log.d( TAG, "Context item selected: "+mDialogUri+" with name "+mDialogCurrentName );
-
-            String trackName = mTrackNameView.getText().toString();
-            ContentValues values = new ContentValues();
-            values.put(Tracks.NAME, trackName);
-            TrackList.this.getContentResolver().update(mDialogTrackUri, values, null, null);
         }
     };
     private OnClickListener mVacuumOnClickListener = new DialogInterface.OnClickListener() {
@@ -289,7 +278,7 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
                     break;
                 }
                 case MENU_RENAME: {
-                    showDialog(DIALOG_RENAME);
+                    showTrackRenamingDialog();
                     handled = true;
                     break;
                 }
@@ -317,16 +306,6 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
         Dialog dialog = null;
         Builder builder = null;
         switch (id) {
-            case DIALOG_RENAME:
-                LayoutInflater factory = LayoutInflater.from(this);
-                View view = factory.inflate(R.layout.namedialog, (ViewGroup) findViewById(android.R.id.content), false);
-                mTrackNameView = (EditText) view.findViewById(R.id.nameField);
-                builder = new AlertDialog.Builder(this).setTitle(R.string.dialog_routename_title).setMessage(R.string
-                        .dialog_routename_message).setIcon(android.R.drawable.ic_dialog_alert)
-                        .setPositiveButton(R.string.btn_okay, mRenameOnClickListener)
-                        .setNegativeButton(R.string.btn_cancel, null).setView(view);
-                dialog = builder.create();
-                return dialog;
             case DIALOG_DELETE:
                 builder = new AlertDialog.Builder(TrackList.this).setTitle(R.string.dialog_delete_title).setIcon(android
                         .R.drawable.ic_dialog_alert).setNegativeButton(android.R.string.cancel, null)
@@ -375,10 +354,6 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
         AlertDialog alert;
         String message;
         switch (id) {
-            case DIALOG_RENAME:
-                mTrackNameView.setText(mDialogCurrentName);
-                mTrackNameView.setSelection(0, mDialogCurrentName.length());
-                break;
             case DIALOG_DELETE:
                 alert = (AlertDialog) dialog;
                 String messageFormat = this.getResources().getString(R.string.dialog_delete_message);
@@ -400,6 +375,21 @@ public class TrackList extends AppCompatActivity implements ProgressListener {
                 alert.setMessage(getString(R.string.dialog_import_message, mImportTrackName));
                 break;
         }
+    }
+
+    private void showTrackRenamingDialog() {
+        TrackRenamingFragment.show(this, mDialogCurrentName);
+    }
+
+    @Override
+    public void onTrackRenamed(@NonNull String trackName) {
+        updateTrackName(trackName);
+    }
+
+    private void updateTrackName(@NonNull String trackName) {
+        ContentValues values = new ContentValues();
+        values.put(Tracks.NAME, trackName);
+        TrackList.this.getContentResolver().update(mDialogTrackUri, values, null, null);
     }
 
     /**
